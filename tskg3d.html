@@ -2,16 +2,64 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>GIS高压开关3D</title>
+  <title>SolidWorks 3D模型展示</title>
   <style>
-    body { margin: 0; background: linear-gradient(135deg, #2c3e50, #000000); }
-    canvas { display: block; }
-    /* 加载进度条样式 */
-    #loading { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); color: #fff; font-size: 18px; }
+    body { 
+      margin: 0; 
+      background: linear-gradient(135deg, #eef0f1, #a5a4a0);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      position: relative;
+    }
+    canvas { 
+      display: block; 
+      border-radius: 12px;
+      box-shadow: 0 0 40px rgb(246, 248, 250);
+    }
+    /* 右上角返回按钮样式 */
+    #backBtn {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 8px;
+      background: #ffffff;
+      color: #2d8cf0;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+      transition: all 0.3s ease;
+      z-index: 999;
+    }
+    #backBtn:hover {
+      background: #2d8cf0;
+      color: #ffffff;
+      transform: translateY(-2px);
+    }
+    /* 新增：加载进度条样式 */
+    #loading {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #2d8cf0;
+      font-size: 22px;
+      font-weight: bold;
+      z-index: 9999;
+      text-shadow: 0 0 10px rgba(255,255,255,0.8);
+    }
   </style>
 </head>
 <body>
+
+<!-- 加载进度提示 -->
 <div id="loading">模型加载中... 0%</div>
+<!-- 返回按钮 -->
+<button id="backBtn">← 返回</button>
 
 <script type="importmap">
 {
@@ -27,59 +75,95 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 
+// 基础场景
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.01, 10000);
-const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-renderer.setSize(window.innerWidth, window.innerHeight);
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 10000);
+const renderer = new THREE.WebGLRenderer({ 
+  antialias: true, 
+  alpha: true 
+});
+renderer.setSize(window.innerWidth * 0.9, window.innerHeight * 0.9);
 document.body.appendChild(renderer.domElement);
 
+// 超流畅鼠标控制
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
+controls.dampingFactor = 0.08;
 controls.autoRotate = true;
+controls.autoRotateSpeed = 10;
 
-scene.add(new THREE.AmbientLight(0xffffff, 2));
-const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
-dirLight.position.set(10,10,10);
-scene.add(dirLight);
+// 专业布光
+const ambientLight = new THREE.AmbientLight(0xffffff, 1.1);
+scene.add(ambientLight);
 
+const mainLight = new THREE.DirectionalLight(0xffffff, 1.8);
+mainLight.position.set(5, 10, 7);
+scene.add(mainLight);
+
+const fillLight = new THREE.DirectionalLight(0x4fc3f7, 0.6);
+fillLight.position.set(-5, 3, 5);
+scene.add(fillLight);
+
+// 获取加载提示元素
 const loadingText = document.getElementById('loading');
 const loader = new OBJLoader();
 
-// 带加载进度的模型加载
+// 加载OBJ模型 + 新增加载进度
 loader.load('1.obj', (object) => {
+  // 加载完成，隐藏进度条
   loadingText.style.display = 'none';
+  
+  // 材质设置
   object.traverse((child) => {
-    if(child.isMesh) child.material = new THREE.MeshStandardMaterial({
-      color: 0xEEEEEE, metalness:0.2, roughness:0.7
-    });
+    if (child.isMesh) {
+      child.material = new THREE.MeshStandardMaterial({
+        color: 0xEEEEEE,
+        metalness: 0.4,
+        roughness: 0.2,
+        side: THREE.DoubleSide
+      });
+    }
   });
 
+  // 自动居中+适配大小
   const box = new THREE.Box3().setFromObject(object);
   const center = box.getCenter(new THREE.Vector3());
-  const maxSize = box.getSize(new THREE.Vector3()).length();
-  object.scale.multiplyScalar(3/maxSize);
-  object.position.sub(center.multiplyScalar(3/maxSize));
+  const size = box.getSize(new THREE.Vector3());
+  const maxSize = Math.max(size.x, size.y, size.z);
+  const scale = 2.5 / maxSize;
 
+  object.scale.multiplyScalar(scale);
+  object.position.sub(center.multiplyScalar(scale));
+  
   scene.add(object);
   camera.position.z = 5;
 }, (xhr) => {
-  // 实时显示加载进度
+  // 实时更新加载进度
   const percent = Math.round((xhr.loaded / xhr.total) * 100);
   loadingText.innerText = `模型加载中... ${percent}%`;
 });
 
-function animate(){
+// 渲染循环
+function animate() {
   requestAnimationFrame(animate);
   controls.update();
-  renderer.render(scene,camera);
+  renderer.render(scene, camera);
 }
 animate();
 
-window.addEventListener('resize',()=>{
-  camera.aspect = window.innerWidth/window.innerHeight;
+// 窗口自适应
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-})
+  renderer.setSize(window.innerWidth * 0.9, window.innerHeight * 0.9);
+});
+
+// 返回按钮事件
+const backBtn = document.getElementById('backBtn');
+backBtn.addEventListener('click', () => {
+  window.history.back();
+});
 </script>
+
 </body>
 </html>
