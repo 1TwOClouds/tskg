@@ -2,51 +2,16 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>SolidWorks 3D模型展示</title>
+  <title>GIS高压开关3D</title>
   <style>
-    body { 
-      margin: 0; 
-      background: linear-gradient(135deg, #eef0f1, #a5a4a0);
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      /* 新增：为固定定位的按钮提供基准 */
-      position: relative;
-    }
-    canvas { 
-      display: block; 
-      border-radius: 12px;
-      box-shadow: 0 0 40px rgb(246, 248, 250);
-    }
-    /* 新增：右上角返回按钮样式 */
-    #backBtn {
-      position: fixed;
-      top: 20px;
-      right: 20px;
-      padding: 10px 20px;
-      border: none;
-      border-radius: 8px;
-      background: #ffffff;
-      color: #2d8cf0;
-      font-size: 16px;
-      font-weight: bold;
-      cursor: pointer;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-      transition: all 0.3s ease;
-      z-index: 999; /* 确保按钮在最上层 */
-    }
-    #backBtn:hover {
-      background: #ffffff;
-      color: #ffffff;
-      transform: translateY(-2px);
-    }
+    body { margin: 0; background: linear-gradient(135deg, #2c3e50, #000000); }
+    canvas { display: block; }
+    /* 加载进度条样式 */
+    #loading { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); color: #fff; font-size: 18px; }
   </style>
 </head>
 <body>
-
-<!-- 新增：返回按钮 -->
-<button id="backBtn">← 返回</button>
+<div id="loading">模型加载中... 0%</div>
 
 <script type="importmap">
 {
@@ -62,86 +27,59 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
 
-// 基础场景
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 10000);
-const renderer = new THREE.WebGLRenderer({ 
-  antialias: true, 
-  alpha: true 
-});
-renderer.setSize(window.innerWidth * 0.9, window.innerHeight * 0.9);
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.01, 10000);
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-// 【优化1】超流畅鼠标控制
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
-controls.dampingFactor = 0.08;
 controls.autoRotate = true;
-controls.autoRotateSpeed = 10;
 
-// 【优化2】专业布光（机械零件立体光影）
-const ambientLight = new THREE.AmbientLight(0xffffff, 1.1);
-scene.add(ambientLight);
+scene.add(new THREE.AmbientLight(0xffffff, 2));
+const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
+dirLight.position.set(10,10,10);
+scene.add(dirLight);
 
-const mainLight = new THREE.DirectionalLight(0xffffff, 1.8);
-mainLight.position.set(5, 10, 7);
-scene.add(mainLight);
-
-const fillLight = new THREE.DirectionalLight(0x4fc3f7, 0.6);
-fillLight.position.set(-5, 3, 5);
-scene.add(fillLight);
-
-// 加载OBJ模型
+const loadingText = document.getElementById('loading');
 const loader = new OBJLoader();
+
+// 带加载进度的模型加载
 loader.load('1.obj', (object) => {
-  // 【优化3】机械零件专用材质（磨砂金属质感，不发白）
+  loadingText.style.display = 'none';
   object.traverse((child) => {
-    if (child.isMesh) {
-      child.material = new THREE.MeshStandardMaterial({
-     color: 0xEEEEEE,
-     metalness: 0.4,
-     roughness: 0.2,
-     side: THREE.DoubleSide
-      });
-    }
+    if(child.isMesh) child.material = new THREE.MeshStandardMaterial({
+      color: 0xEEEEEE, metalness:0.2, roughness:0.7
+    });
   });
 
-  // 【优化4】自动居中+自动适配大小
   const box = new THREE.Box3().setFromObject(object);
   const center = box.getCenter(new THREE.Vector3());
-  const size = box.getSize(new THREE.Vector3());
-  const maxSize = Math.max(size.x, size.y, size.z);
-  const scale = 2.5 / maxSize;
+  const maxSize = box.getSize(new THREE.Vector3()).length();
+  object.scale.multiplyScalar(3/maxSize);
+  object.position.sub(center.multiplyScalar(3/maxSize));
 
-  object.scale.multiplyScalar(scale);
-  object.position.sub(center.multiplyScalar(scale));
-  
   scene.add(object);
   camera.position.z = 5;
+}, (xhr) => {
+  // 实时显示加载进度
+  const percent = Math.round((xhr.loaded / xhr.total) * 100);
+  loadingText.innerText = `模型加载中... ${percent}%`;
 });
 
-// 渲染循环
-function animate() {
+function animate(){
   requestAnimationFrame(animate);
   controls.update();
-  renderer.render(scene, camera);
+  renderer.render(scene,camera);
 }
 animate();
 
-// 窗口自适应
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
+window.addEventListener('resize',()=>{
+  camera.aspect = window.innerWidth/window.innerHeight;
   camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth * 0.9, window.innerHeight * 0.9);
-});
-
-// 新增：返回按钮点击事件
-const backBtn = document.getElementById('backBtn');
-backBtn.addEventListener('click', () => {
-  window.history.back(); // 返回上一页
-  // 如果需要直接跳转到指定链接，替换成：window.location.href = '你的目标链接';
-});
+  renderer.setSize(window.innerWidth, window.innerHeight);
+})
 </script>
-
 </body>
 </html>
